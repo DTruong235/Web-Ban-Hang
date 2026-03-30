@@ -1,0 +1,10 @@
+# Các thư mục/file của Visual Studio
+.vs/
+*.suo
+*.user
+*.config.user
+*.resharper
+
+# Các thư mục/file của bin/obj
+[Bb]in/
+[Oo]bj/
