@@ -1,6 +1,8 @@
 <?php
 require_once 'db.php';
 
+
+
 // 1. Lấy ID danh mục từ URL
 $category_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
@@ -23,13 +25,24 @@ $sql_subcats = "SELECT * FROM sub_categories WHERE category_id = $category_id";
 $res_subcats = $conn->query($sql_subcats);
 
 // 5. Lấy SẢN PHẨM thuộc danh mục này (có kèm điều kiện lọc theo Thể loại con)
+// --- BẮT ĐẦU CẬP NHẬT LOGIC LỌC ---
+$subcat_id = isset($_GET['subcat']) ? (int)$_GET['subcat'] : 0;
+$brand_id = isset($_GET['brand']) ? (int)$_GET['brand'] : 0; // Thêm biến nhận Hãng từ URL
+
+// Lấy SẢN PHẨM thuộc danh mục này (có kèm điều kiện lọc)
 $sql_pro = "SELECT * FROM products WHERE category_id = $category_id AND status = 1";
+
 if ($subcat_id > 0) {
-    // Nếu có chọn thể loại con thì nối thêm điều kiện này vào câu SQL
-    $sql_pro .= " AND sub_category_id = $subcat_id";
+    $sql_pro .= " AND sub_category_id = $subcat_id"; // Nối thêm lọc thể loại con
 }
+
+if ($brand_id > 0) {
+    $sql_pro .= " AND brand_id = $brand_id"; // Nối thêm lọc Hãng sản xuất
+}
+
 $sql_pro .= " ORDER BY id DESC";
 $result_pro = $conn->query($sql_pro);
+// --- KẾT THÚC CẬP NHẬT LOGIC LỌC ---
 
 // 6. Lấy KHUYẾN MÃI SỐC (Sản phẩm có giảm giá trong danh mục này)
 $sql_flash = "SELECT * 
@@ -162,11 +175,65 @@ if (isset($_SESSION['cart'])) {
                     <!-- <ul class="navbar-nav mx-auto align-items-center">
                         <li class="nav-item"><a class="nav-link" href="#">Trang chủ</a></li>
                     </ul> -->
-                    <input class="form-control" list="datalistOptions" id="exampleDataList" placeholder="Type to search...">
+                    <form action="search.php" method="GET" class="d-flex mx-auto w-100 px-3" style="max-width: 600px;">
+                        <div class="input-group shadow-sm">
+                            <input type="text" name="keyword" class="form-control border-0 px-3 py-2" placeholder="Bạn muốn tìm sản phẩm gì?..."
+                                value="<?= isset($_GET['keyword']) ? htmlspecialchars($_GET['keyword']) : '' ?>" required>
+                            <button class="btn btn-warning text-dark fw-bold px-4" type="submit">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </form>
                     <ul class="navbar-nav align-items-center">
+                        <?php if(isset($_SESSION['user_id'])): ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle fw-bold text-warning" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-user-circle fs-5 me-1"></i> <?= htmlspecialchars($_SESSION['user_name']) ?>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                    <?php if($_SESSION['user_role'] == 1): ?>
+                                        <li><a class="dropdown-item fw-bold text-success" href="admin/products.php"><i class="fas fa-shield-alt me-2"></i> Vào trang Admin</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                    <?php endif; ?>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-box me-2"></i> Đơn hàng của tôi</a></li>
+                                    <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a></li>
+                                </ul>
+                            </li>
+                        <?php else: ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">Đăng nhập</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#registerModal">Đăng ký</a>
+                            </li>
+                        <?php endif; ?>
+                        
+                        <li class="nav-item ms-lg-2">
+                            <a href="#" class="nav-link text-white" data-bs-toggle="modal" data-bs-target="#searchModal" title="Tìm kiếm">
+                                <i class="fas fa-search fs-5"></i>
+                            </a>
+                        </li>
+
                         <li class="nav-item ms-lg-3 mt-2 mt-lg-0">
                             <a href="cart.php" class="cart-icon position-relative text-white">
                                 <i class="fas fa-shopping-cart fs-5"></i>
+                                <?php
+                                // --- LOGIC ĐẾM SỐ LƯỢNG MỚI ---
+                                $cart_count = 0;
+                                if (isset($_SESSION['user_id'])) {
+                                    // Đã đăng nhập: Đếm trong database
+                                    $uid = (int)$_SESSION['user_id'];
+                                    $c_res = $conn->query("SELECT SUM(quantity) as total FROM cart WHERE user_id = $uid");
+                                    if ($c_res && $c_row = $c_res->fetch_assoc()) {
+                                        $cart_count = $c_row['total'] ?? 0;
+                                    }
+                                } else if (isset($_SESSION['cart'])) {
+                                    // Chưa đăng nhập: Đếm trong session
+                                    foreach ($_SESSION['cart'] as $item) {
+                                        $cart_count += $item['quantity'];
+                                    }
+                                }
+                                ?>
                                 <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
                                     <?= $cart_count ?>
                                 </span>
@@ -190,7 +257,7 @@ if (isset($_SESSION['cart'])) {
     <!-- Thể loại -->
     <section class="container mb-3">
         <div class="d-flex gap-3 overflow-auto hide-scrollbar py-2">
-            
+
             <a href="category.php?id=<?= $category_id ?>" class="filter-pill <?= ($subcat_id == 0) ? 'active' : 'text-muted' ?> text-center" style="min-width: 80px;">
                 <img src="https://cdn-icons-png.flaticon.com/512/3014/3014502.png" alt="All" height="40" class="d-block mx-auto mb-2 <?= ($subcat_id == 0) ? '' : 'opacity-50' ?>">
                 Tất cả
@@ -198,12 +265,12 @@ if (isset($_SESSION['cart'])) {
 
             <?php if ($res_subcats && $res_subcats->num_rows > 0): ?>
                 <?php while ($sub = $res_subcats->fetch_assoc()): ?>
-                    <?php 
-                        // Kiểm tra xem thẻ này có đang được click không
-                        $is_active = ($subcat_id == $sub['id']);
-                        
-                        // Lấy ảnh từ database, nếu trống thì dùng ảnh mặc định
-                        $sub_img = !empty($sub['image']) ? $sub['image'] : 'https://cdn-icons-png.flaticon.com/512/2515/2515150.png';
+                    <?php
+                    // Kiểm tra xem thẻ này có đang được click không
+                    $is_active = ($subcat_id == $sub['id']);
+
+                    // Lấy ảnh từ database, nếu trống thì dùng ảnh mặc định
+                    $sub_img = !empty($sub['image']) ? $sub['image'] : 'https://cdn-icons-png.flaticon.com/512/2515/2515150.png';
                     ?>
                     <a href="category.php?id=<?= $category_id ?>&subcat=<?= $sub['id'] ?>" class="filter-pill <?= $is_active ? 'active' : 'text-muted' ?> text-center" style="min-width: 80px;">
                         <img src="<?= $sub_img ?>" alt="<?= htmlspecialchars($sub['name']) ?>" height="60" class="d-block mx-auto mb-2 <?= $is_active ? '' : '' ?>">
@@ -211,25 +278,39 @@ if (isset($_SESSION['cart'])) {
                     </a>
                 <?php endwhile; ?>
             <?php endif; ?>
-            
+
         </div>
     </section>
     <!-- Lọc -->
     <section class="container mb-4">
         <div class="d-flex align-items-center flex-wrap gap-2">
+
+            <span class="text-muted small fw-bold me-2">Thương hiệu:</span>
+
+            <a href="category.php?id=<?= $category_id ?><?= $subcat_id > 0 ? '&subcat=' . $subcat_id : '' ?>"
+                class="filter-pill <?= ($brand_id == 0) ? 'active' : 'text-muted' ?>">
+                Tất cả
+            </a>
+
             <?php if ($res_brands && $res_brands->num_rows > 0): ?>
                 <?php while ($b = $res_brands->fetch_assoc()): ?>
-                    <a href="#" class="filter-pill fw-bold text-danger"><?= htmlspecialchars($b['name']) ?></a>
+                    <?php
+                    // Kiểm tra xem Hãng này có đang được chọn không
+                    $is_brand_active = ($brand_id == $b['id']);
+                    ?>
+                    <a href="category.php?id=<?= $category_id ?><?= $subcat_id > 0 ? '&subcat=' . $subcat_id : '' ?>&brand=<?= $b['id'] ?>"
+                        class="filter-pill <?= $is_brand_active ? 'active text-danger fw-bold border-danger' : 'fw-semibold text-danger' ?>">
+                        <?= htmlspecialchars($b['name']) ?>
+                    </a>
                 <?php endwhile; ?>
             <?php endif; ?>
 
-            <div class="ms-auto d-flex gap-2">
+            <div class="ms-auto d-flex gap-2 mt-2 mt-md-0">
                 <select class="form-select form-select-sm" style="width: 130px;">
                     <option>Sắp xếp</option>
                     <option>Giá tăng dần</option>
                     <option>Giá giảm dần</option>
                 </select>
-                <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-filter"></i> Bộ lọc</button>
             </div>
         </div>
     </section>

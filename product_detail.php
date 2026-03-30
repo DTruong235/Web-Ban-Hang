@@ -69,22 +69,54 @@ $product = $result->fetch_assoc();
                             <a class="nav-link" href="#">Liện hệ</a>
                         </li>
                     </ul>
-
+                    <!-- Đăng nhập | Đăng ký -->
                     <ul class="navbar-nav align-items-center">
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Đăng nhập</a>
+                        <?php if(isset($_SESSION['user_id'])): ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle fw-bold text-warning" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-user-circle fs-5 me-1"></i> <?= htmlspecialchars($_SESSION['user_name']) ?>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                    <?php if($_SESSION['user_role'] == 1): ?>
+                                        <li><a class="dropdown-item fw-bold text-success" href="admin/products.php"><i class="fas fa-shield-alt me-2"></i> Vào trang Admin</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                    <?php endif; ?>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-box me-2"></i> Đơn hàng của tôi</a></li>
+                                    <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a></li>
+                                </ul>
+                            </li>
+                        <?php else: ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">Đăng nhập</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#registerModal">Đăng ký</a>
+                            </li>
+                        <?php endif; ?>
+                        
+                        <li class="nav-item ms-lg-2">
+                            <a href="#" class="nav-link text-white" data-bs-toggle="modal" data-bs-target="#searchModal" title="Tìm kiếm">
+                                <i class="fas fa-search fs-5"></i>
+                            </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Đăng ký</a>
-                        </li>
+
                         <li class="nav-item ms-lg-3 mt-2 mt-lg-0">
                             <a href="cart.php" class="cart-icon position-relative text-white">
                                 <i class="fas fa-shopping-cart fs-5"></i>
                                 <?php
+                                // --- LOGIC ĐẾM SỐ LƯỢNG MỚI ---
                                 $cart_count = 0;
-                                if (isset($_SESSION['cart'])) {
+                                if (isset($_SESSION['user_id'])) {
+                                    // Đã đăng nhập: Đếm trong database
+                                    $uid = (int)$_SESSION['user_id'];
+                                    $c_res = $conn->query("SELECT SUM(quantity) as total FROM cart WHERE user_id = $uid");
+                                    if ($c_res && $c_row = $c_res->fetch_assoc()) {
+                                        $cart_count = $c_row['total'] ?? 0;
+                                    }
+                                } else if (isset($_SESSION['cart'])) {
+                                    // Chưa đăng nhập: Đếm trong session
                                     foreach ($_SESSION['cart'] as $item) {
-                                        $cart_count += $item['quantity']; // Cộng dồn số lượng các món
+                                        $cart_count += $item['quantity'];
                                     }
                                 }
                                 ?>

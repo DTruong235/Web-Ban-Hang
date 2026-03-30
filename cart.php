@@ -1,22 +1,45 @@
 <?php
 require_once 'db.php'; // Đã có session_start()
 
+// ===============================================
 // 1. XỬ LÝ XÓA SẢN PHẨM KHỎI GIỎ
+// ===============================================
 if (isset($_GET['remove'])) {
     $id_to_remove = (int)$_GET['remove'];
-    if (isset($_SESSION['cart'][$id_to_remove])) {
-        unset($_SESSION['cart'][$id_to_remove]);
+    
+    if (isset($_SESSION['user_id'])) {
+        // Xóa trong Database nếu đã đăng nhập
+        $uid = $_SESSION['user_id'];
+        $conn->query("DELETE FROM cart WHERE user_id = $uid AND product_id = $id_to_remove");
+    } else {
+        // Xóa trong Session nếu là khách
+        if (isset($_SESSION['cart'][$id_to_remove])) {
+            unset($_SESSION['cart'][$id_to_remove]);
+        }
     }
     header("Location: cart.php");
     exit();
 }
 
+// ===============================================
 // 2. XỬ LÝ CẬP NHẬT SỐ LƯỢNG KHI BẤM "CẬP NHẬT GIỎ HÀNG"
-if (isset($_POST['update_cart'])) {
-    if (isset($_POST['qty'])) {
+// ===============================================
+if (isset($_POST['update_cart']) && isset($_POST['qty'])) {
+    if (isset($_SESSION['user_id'])) {
+        // Cập nhật Database nếu đã đăng nhập
+        $uid = $_SESSION['user_id'];
         foreach ($_POST['qty'] as $id => $quantity) {
-            $id = (int)$id;
-            $quantity = (int)$quantity;
+            $id = (int)$id; $quantity = (int)$quantity;
+            if ($quantity <= 0) {
+                $conn->query("DELETE FROM cart WHERE user_id = $uid AND product_id = $id");
+            } else {
+                $conn->query("UPDATE cart SET quantity = $quantity WHERE user_id = $uid AND product_id = $id");
+            }
+        }
+    } else {
+        // Cập nhật Session nếu là khách
+        foreach ($_POST['qty'] as $id => $quantity) {
+            $id = (int)$id; $quantity = (int)$quantity;
             if ($quantity <= 0) {
                 unset($_SESSION['cart'][$id]);
             } else {
@@ -28,10 +51,61 @@ if (isset($_POST['update_cart'])) {
     exit();
 }
 
-$cart = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
+// ===============================================
+// 3. XUẤT DỮ LIỆU RA GIỎ HÀNG ĐỂ HIỂN THỊ
+// ===============================================
+$cart = [];
 $cart_count = 0;
-foreach ($cart as $item) {
-    $cart_count += $item['quantity'];
+
+if (isset($_SESSION['user_id'])) {
+    // A. LẤY TỪ DATABASE CHO TÀI KHOẢN ĐÃ ĐĂNG NHẬP
+    $uid = (int)$_SESSION['user_id'];
+    $sql = "SELECT c.product_id, c.quantity, p.name, p.price, p.discount_price, p.cover_image 
+            FROM cart c 
+            JOIN products p ON c.product_id = p.id 
+            WHERE c.user_id = $uid";
+    $result = $conn->query($sql);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $pid = $row['product_id'];
+            // Nếu có giá giảm thì lấy giá giảm, không thì lấy giá gốc
+            $final_price = ($row['discount_price'] != NULL) ? $row['discount_price'] : $row['price'];
+            
+            $cart[$pid] = [
+                'product_id' => $pid,
+                'name' => $row['name'],
+                'price' => $final_price,
+                'quantity' => $row['quantity'],
+                'image' => $row['cover_image']
+            ];
+            $cart_count += $row['quantity'];
+        }
+    }
+} else {
+    // B. LẤY TỪ SESSION CHO KHÁCH VÃNG LAI
+    if (isset($_SESSION['cart']) && !empty($_SESSION['cart'])) {
+        // Lấy danh sách các ID sản phẩm trong giỏ để truy vấn lấy tên, ảnh, giá
+        $product_ids = implode(',', array_keys($_SESSION['cart']));
+        $sql = "SELECT id, name, price, discount_price, cover_image FROM products WHERE id IN ($product_ids)";
+        $result = $conn->query($sql);
+        
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $pid = $row['id'];
+                $final_price = ($row['discount_price'] != NULL) ? $row['discount_price'] : $row['price'];
+                
+                $cart[$pid] = [
+                    'product_id' => $pid,
+                    'name' => $row['name'],
+                    'price' => $final_price,
+                    'quantity' => $_SESSION['cart'][$pid]['quantity'],
+                    'image' => $row['cover_image']
+                ];
+                $cart_count += $_SESSION['cart'][$pid]['quantity'];
+            }
+        }
+    }
 }
 ?>
 
@@ -63,6 +137,23 @@ foreach ($cart as $item) {
                         <li class="nav-item ms-lg-3 mt-2 mt-lg-0">
                             <a href="cart.php" class="cart-icon position-relative text-warning">
                                 <i class="fas fa-shopping-cart fs-5"></i>
+                                <?php
+                                    // --- LOGIC ĐẾM SỐ LƯỢNG MỚI ---
+                                $cart_count = 0;
+                                if (isset($_SESSION['user_id'])) {
+                                    // Đã đăng nhập: Đếm trong database
+                                    $uid = (int)$_SESSION['user_id'];
+                                    $c_res = $conn->query("SELECT SUM(quantity) as total FROM cart WHERE user_id = $uid");
+                                    if ($c_res && $c_row = $c_res->fetch_assoc()) {
+                                        $cart_count = $c_row['total'] ?? 0;
+                                    }
+                                } else if (isset($_SESSION['cart'])) {
+                                    // Chưa đăng nhập: Đếm trong session
+                                    foreach ($_SESSION['cart'] as $item) {
+                                        $cart_count += $item['quantity'];
+                                    }
+                                }
+                                ?>
                                 <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
                                     <?= $cart_count ?>
                                 </span>

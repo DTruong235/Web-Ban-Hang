@@ -70,23 +70,54 @@ $result_drinks = $conn->query($sql_drinks);
                             <a class="nav-link" href="#">Liện hệ</a>
                         </li>
                     </ul>
-
+                    <!-- Đăng nhập | Đăng ký -->
                     <ul class="navbar-nav align-items-center">
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Đăng nhập</a>
+                        <?php if(isset($_SESSION['user_id'])): ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle fw-bold text-warning" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-user-circle fs-5 me-1"></i> <?= htmlspecialchars($_SESSION['user_name']) ?>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                    <?php if($_SESSION['user_role'] == 1): ?>
+                                        <li><a class="dropdown-item fw-bold text-success" href="admin/products.php"><i class="fas fa-shield-alt me-2"></i> Vào trang Admin</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                    <?php endif; ?>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-box me-2"></i> Đơn hàng của tôi</a></li>
+                                    <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a></li>
+                                </ul>
+                            </li>
+                        <?php else: ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">Đăng nhập</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#registerModal">Đăng ký</a>
+                            </li>
+                        <?php endif; ?>
+                        
+                        <li class="nav-item ms-lg-2">
+                            <a href="#" class="nav-link text-white" data-bs-toggle="modal" data-bs-target="#searchModal" title="Tìm kiếm">
+                                <i class="fas fa-search fs-5"></i>
+                            </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Đăng ký</a>
-                        </li>
-                        <!-- Tính năng giỏ hàng -->
+
                         <li class="nav-item ms-lg-3 mt-2 mt-lg-0">
                             <a href="cart.php" class="cart-icon position-relative text-white">
                                 <i class="fas fa-shopping-cart fs-5"></i>
                                 <?php
+                                /// --- LOGIC ĐẾM SỐ LƯỢNG MỚI ---
                                 $cart_count = 0;
-                                if (isset($_SESSION['cart'])) {
+                                if (isset($_SESSION['user_id'])) {
+                                    // Đã đăng nhập: Đếm trong database
+                                    $uid = (int)$_SESSION['user_id'];
+                                    $c_res = $conn->query("SELECT SUM(quantity) as total FROM cart WHERE user_id = $uid");
+                                    if ($c_res && $c_row = $c_res->fetch_assoc()) {
+                                        $cart_count = $c_row['total'] ?? 0;
+                                    }
+                                } else if (isset($_SESSION['cart'])) {
+                                    // Chưa đăng nhập: Đếm trong session
                                     foreach ($_SESSION['cart'] as $item) {
-                                        $cart_count += $item['quantity']; // Cộng dồn số lượng các món
+                                        $cart_count += $item['quantity'];
                                     }
                                 }
                                 ?>
@@ -543,6 +574,92 @@ $result_drinks = $conn->query($sql_drinks);
             </div>
         </div>
     </footer>
+    <!-- Modal Tìm kiếm -->
+    <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body px-4 pb-5 text-center">
+                    <h5 class="fw-bold mb-4" style="color: var(--tempi-green);">Bạn muốn tìm sản phẩm gì?</h5>
+                    <form action="search.php" method="GET" class="d-flex w-100">
+                        <input type="text" name="keyword" class="form-control rounded-start-pill py-3 ps-4 border-success" placeholder="Ví dụ: Mì Hảo Hảo, Sữa tươi..." required autofocus>
+                        <button class="btn btn-warning rounded-end-pill px-4 fw-bold text-dark border-0" type="submit">
+                            <i class="fas fa-search me-1"></i> Tìm
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Đăng nhập -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-tempi-green text-white">
+                    <h5 class="modal-title fw-bold">Đăng nhập tài khoản</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form action="auth.php" method="POST">
+                        <input type="hidden" name="action" value="login">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Email</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Mật khẩu</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100 fw-bold">ĐĂNG NHẬP</button>
+                        <div class="text-center mt-3 small">
+                            Chưa có tài khoản? <a href="#" data-bs-toggle="modal" data-bs-target="#registerModal" class="text-decoration-none fw-bold text-success">Đăng ký ngay</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="registerModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold">Đăng ký thành viên</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form action="auth.php" method="POST">
+                        <input type="hidden" name="action" value="register">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Họ và tên</label>
+                            <input type="text" name="fullname" class="form-control" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label fw-bold">Số điện thoại</label>
+                                <input type="text" name="phone" class="form-control" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label fw-bold">Email</label>
+                                <input type="email" name="email" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Địa chỉ giao hàng (Cụ thể)</label>
+                            <input type="text" name="address" class="form-control" placeholder="Số nhà, Đường, Phường/Xã..." required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Mật khẩu</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">ĐĂNG KÝ TÀI KHOẢN</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
         // Hàm xử lý chạy ngầm
         function addToCart(productId) {

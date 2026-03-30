@@ -111,16 +111,23 @@ $result = $conn->query($sql);
 <body class="bg-light">
     <div class="container-fluid">
         <div class="row">
+            <!-- Sidebar -->
             <div class="col-md-2 p-0 sidebar text-white">
                 <div class="p-4 text-center border-bottom border-secondary">
-                    <h4 class="fw-bold text-warning mb-0">TEMPI ADMIN</h4>
+                    <h4 class="fw-bold text-warning mb-0">BÁCH HÓA PEW</h4>
+                    <div class="mt-2 small opacity-75">
+                        <i class="fas fa-user-shield"></i> <?= isset($_SESSION['user_name']) ? htmlspecialchars($_SESSION['user_name']) : 'Quản trị viên' ?><br>
+                        <span style="font-size: 0.8em;">ID: <?= isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'ADMIN' ?></span>
+                    </div>
                 </div>
                 <div class="mt-3">
                     <a href="categorys.php"><i class="fas fa-list me-2"></i> Danh Mục Gốc</a>
-                    <a href="sub_categories.php" style="background-color: #00452d; border-left: 4px solid #f9b612;"><i class="fas fa-tags me-2"></i> Thể Loại Con</a>
+                    <a href="sub_categories.php"><i class="fas fa-tags me-2"></i> Thể Loại Con</a>
+                    <a href="brands.php"><i class="fas fa-copyright me-2"></i> Hãng Sản Xuất</a>
                     <a href="products.php"><i class="fas fa-box me-2"></i> Sản Phẩm</a>
                     <a href="customers.php"><i class="fas fa-users me-2"></i> Khách Hàng</a>
                     <a href="orders.php"><i class="fas fa-file-invoice-dollar me-2"></i> Đơn Hàng</a>
+                    <a href="../logout.php" class="text-danger mt-5"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a>
                 </div>
             </div>
 

@@ -1,55 +1,59 @@
 <?php
-require_once 'db.php'; // Chứa sẵn session_start()
+require_once 'db.php'; // Đã có session_start()
 
-if (isset($_GET['id'])) {
-    $id = (int)$_GET['id'];
+$product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$action = isset($_GET['action']) ? $_GET['action'] : '';
+$is_ajax = isset($_GET['ajax']) ? 1 : 0;
 
-    // Lấy thông tin sản phẩm
-    $sql = "SELECT * FROM products WHERE id = $id AND status = 1";
-    $result = $conn->query($sql);
-
-    if ($result && $result->num_rows > 0) {
-        $product = $result->fetch_assoc();
-        $price = ($product['discount_price'] != NULL) ? $product['discount_price'] : $product['price'];
-
+if ($product_id > 0) {
+    // 1. NẾU KHÁCH ĐÃ ĐĂNG NHẬP (Lưu thẳng vào Database)
+    if (isset($_SESSION['user_id'])) {
+        $uid = $_SESSION['user_id'];
+        
+        $check = $conn->query("SELECT id FROM cart WHERE user_id = $uid AND product_id = $product_id");
+        if ($check->num_rows > 0) {
+            $conn->query("UPDATE cart SET quantity = quantity + 1 WHERE user_id = $uid AND product_id = $product_id");
+        } else {
+            $conn->query("INSERT INTO cart (user_id, product_id, quantity) VALUES ($uid, $product_id, 1)");
+        }
+    } 
+    // 2. NẾU LÀ KHÁCH VÃNG LAI (Lưu tạm vào Session)
+    else {
         if (!isset($_SESSION['cart'])) {
             $_SESSION['cart'] = [];
         }
-
-        if (isset($_SESSION['cart'][$id])) {
-            $_SESSION['cart'][$id]['quantity'] += 1;
+        if (isset($_SESSION['cart'][$product_id])) {
+            $_SESSION['cart'][$product_id]['quantity'] += 1;
         } else {
-            $_SESSION['cart'][$id] = [
-                'name' => $product['name'],
-                'price' => $price,
-                'image' => $product['cover_image'],
+            $_SESSION['cart'][$product_id] = [
+                'product_id' => $product_id,
                 'quantity' => 1
             ];
         }
     }
 }
 
-// Đếm tổng số lượng sản phẩm trong giỏ
+// 3. TÍNH LẠI TỔNG SỐ LƯỢNG MÓN ĐỂ HIỂN THỊ LÊN ICON MÀU ĐỎ (BADGE)
 $cart_count = 0;
-if(isset($_SESSION['cart'])) {
-    foreach($_SESSION['cart'] as $item) {
+if (isset($_SESSION['user_id'])) {
+    $uid = $_SESSION['user_id'];
+    $res = $conn->query("SELECT SUM(quantity) as total_qty FROM cart WHERE user_id = $uid");
+    if ($res && $row = $res->fetch_assoc()) {
+        $cart_count = $row['total_qty'] ?? 0;
+    }
+} else if (isset($_SESSION['cart'])) {
+    foreach ($_SESSION['cart'] as $item) {
         $cart_count += $item['quantity'];
     }
 }
 
-// 1. NẾU LÀ YÊU CẦU CHẠY NGẦM TỪ JAVASCRIPT (AJAX)
-if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
-    // Trả về dữ liệu JSON chứa tổng số lượng mới và dừng chạy
+// 4. TRẢ KẾT QUẢ VỀ (Cho JS xử lý hoặc chuyển trang)
+if ($is_ajax) {
     echo json_encode(['status' => 'success', 'cart_count' => $cart_count]);
     exit();
-}
-
-// 2. NẾU BẤM NÚT "MUA NGAY" (Vẫn cần chuyển trang)
-if (isset($_GET['action']) && $_GET['action'] == 'buy_now') {
-    header("Location: cart.php");
 } else {
-    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'index.php';
-    header("Location: $referer");
+    // Nếu bấm nút "Mua Ngay" thì chuyển thẳng sang giỏ hàng
+    header("Location: cart.php");
+    exit();
 }
-exit();
 ?>
