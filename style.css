@@ -226,3 +226,23 @@ body {
     color: white;
     background-color: var(--tempi-green);
 }
+
+.related-products-container {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto; /* Tạo thanh cuộn ngang nếu nhiều sản phẩm */
+    padding: 10px;
+}
+.product-item {
+    width: 200px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.related-product-img {
+    width: 100%;
+    height: 200px; /* Hoặc chiều cao bạn muốn */
+    object-fit: contain; /* Giữ nguyên tỉ lệ ảnh để không bị cắt mất chữ trên thùng nước ngọt */
+    background: #f9f9f9;
+}

@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once('getRelatedProducts.php');
 
 // Lấy ID sản phẩm từ URL (ví dụ: product_detail.php?id=1)
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -18,6 +19,11 @@ if ($result->num_rows == 0) {
 }
 
 $product = $result->fetch_assoc();
+
+$current_id = $product['id'];
+$cat_id = $product['category_id'];
+$current_price = $product['price'];
+
 ?>
 
 <!DOCTYPE html>
@@ -209,11 +215,34 @@ $product = $result->fetch_assoc();
                         </p>
                     </div>
 
+                    
                 </div>
+                
             </div>
         </div>
-    </section>
+        <div class="product-items mt-5">
+            <?php
 
+                $related_products = getRelatedProducts($conn, $current_id, $cat_id, $current_price);
+
+                echo "<h3>Sản phẩm bạn có thể thích</h3>";
+                echo "<div class='related-products-container'>";
+                foreach ($related_products as $item) {
+                    echo "<div class='product-item'>";
+                    echo "<img src='" . $item['cover_image'] 
+                                    . "' alt='" 
+                                    . htmlspecialchars($item['name']) 
+                                    . "' class='related-product-img'>";
+                    echo "<h4>" . $item['name'] . "</h4>";
+                    echo "<p>" . number_format($item['price']) . " VNĐ</p>";
+                    echo "<a href='product-detail.php?id=" . $item['id'] . "'>Xem chi tiết</a>";
+                    echo "</div>";
+                }
+                echo "</div>";
+            ?>
+        </div>
+    </section>
+    
     <footer class="footer-bg text-white pt-5 pb-3">
         <div class="container">
             <div class="row">

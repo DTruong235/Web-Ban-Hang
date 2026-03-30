@@ -4,12 +4,12 @@ session_start();
 
 $host = "127.0.0.1";
 $user = "root";       // Mặc định của XAMPP/WAMP
-$pass = "";           // Mặc định là rỗng
+$pass = "vertrigo";           // Mặc định là rỗng
 $dbname = "ban_hang_db";
-$port = 3307;
+//$port = 3307;
 
 // Tạo kết nối bằng mysqli
-$conn = new mysqli($host, $user, $pass, $dbname, $port);
+$conn = new mysqli($host, $user, $pass, $dbname /*$port*/);
 
 // Kiểm tra kết nối
 if ($conn->connect_error) {
