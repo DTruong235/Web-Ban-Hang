@@ -40,7 +40,16 @@ if (isset($_GET['delete_id'])) {
     exit();
 }
 
-$sql = "SELECT * FROM customers ORDER BY id DESC";
+$search_kw = isset($_GET['search']) ? trim($_GET['search']) : '';
+$sql = "SELECT * FROM customers WHERE 1=1";
+
+if ($search_kw !== '') {
+    $escaped_search = $conn->real_escape_string($search_kw);
+    // Tìm theo Tên HOẶC Số điện thoại
+    $sql .= " AND (full_name LIKE '%$escaped_search%' OR phone_number LIKE '%$escaped_search%')";
+}
+
+$sql .= " ORDER BY id DESC";
 $result = $conn->query($sql);
 ?>
 
@@ -84,9 +93,26 @@ $result = $conn->query($sql);
         <div class="col-md-10 p-5">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="fw-bold">Quản lý Khách Hàng</h2>
+                
                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
                     <i class="fas fa-plus"></i> Thêm khách hàng
                 </button>
+            </div>
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-body bg-white rounded">
+                    <form action="customers.php" method="GET" class="row g-3 align-items-center">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                                <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Tìm theo Tên hoặc Số điện thoại..." value="<?= htmlspecialchars($search_kw) ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary w-100 fw-bold">Tìm</button>
+                            <a href="customers.php" class="btn btn-outline-secondary" title="Tải lại tất cả"><i class="fas fa-redo"></i></a>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <div class="card shadow-sm border-0">

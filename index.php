@@ -193,7 +193,7 @@ $result_drinks = $conn->query($sql_drinks);
                         <div class="category-wrapper mb-2">
                             <img src="<?= $img_src ?>" alt="<?= htmlspecialchars($cat['name']) ?>" class="img-cover p-2">
                         </div>
-                        <span class="small fw-semibold" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        <span class="small fw-semibold" style="display: -webkit-box; -webkit-line-clamp: 2; line-clamp:2;-webkit-box-orient: vertical; overflow: hidden;">
                             <?= htmlspecialchars($cat['name']) ?>
                         </span>
                     </div>
