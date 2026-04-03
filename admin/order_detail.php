@@ -85,7 +85,10 @@ $res_details = $conn->query($sql_details);
             <div class="col-md-10 p-5">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2 class="fw-bold">Chi Tiết Đơn Hàng <span class="text-danger">#<?= $order['id'] ?></span></h2>
-                    <a href="orders.php" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i> Quay lại danh sách</a>
+                    <div>
+                        <a href="export_invoice.php?id=<?= $order['id'] ?>" target="_blank" class="btn btn-success me-2"><i class="fas fa-file-invoice"></i> Xuất hóa đơn</a>
+                        <a href="orders.php" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i> Quay lại danh sách</a>
+                    </div>
                 </div>
 
                 <div class="row">

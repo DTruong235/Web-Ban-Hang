@@ -64,10 +64,10 @@ $result_drinks = $conn->query($sql_drinks);
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Về chúng tôi</a>
+                            <a class="nav-link" href="about.php">Về chúng tôi</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Liện hệ</a>
+                            <a class="nav-link" href="contact.php">Liên hệ</a>
                         </li>
                     </ul>
                     <!-- Đăng nhập | Đăng ký -->

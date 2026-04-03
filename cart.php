@@ -230,7 +230,6 @@ if (isset($_SESSION['user_id'])) {
                             </div>
                             <div class="d-flex justify-content-between mt-4">
                                 <a href="index.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Mua thêm</a>
-                                <button type="submit" formaction="cart.php" name="update_cart" class="btn btn-outline-primary"><i class="fas fa-sync-alt me-2"></i>Cập nhật số lượng</button>
                             </div>
                         </div>
                     </div>
@@ -338,9 +337,27 @@ if (isset($_SESSION['user_id'])) {
                 calculateTotal();
             }));
 
-            // Tự động tính lại khi gõ hoặc bấm tăng giảm số lượng
+            // Tự động cập nhật số lượng khi thay đổi + tính lại tổng tiền
             qtyInputs.forEach(q => {
-                q.addEventListener('change', calculateTotal);
+                q.addEventListener('change', function() {
+                    const productId = this.name.match(/\d+/)[0];
+                    const newQty = parseInt(this.value);
+                    
+                    // Gọi AJAX để cập nhật vào DB/Session
+                    fetch('update_cart_ajax.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'product_id=' + productId + '&quantity=' + newQty
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        console.log('Cập nhật:', data);
+                    })
+                    .catch(err => console.error('Lỗi:', err));
+                    
+                    calculateTotal();
+                });
+                
                 q.addEventListener('keyup', calculateTotal);
             });
 

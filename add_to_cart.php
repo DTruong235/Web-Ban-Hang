@@ -19,16 +19,25 @@ if ($product_id > 0) {
     } 
     // 2. NẾU LÀ KHÁCH VÃNG LAI (Lưu tạm vào Session)
     else {
-        if (!isset($_SESSION['cart'])) {
-            $_SESSION['cart'] = [];
-        }
-        if (isset($_SESSION['cart'][$product_id])) {
-            $_SESSION['cart'][$product_id]['quantity'] += 1;
-        } else {
-            $_SESSION['cart'][$product_id] = [
-                'product_id' => $product_id,
-                'quantity' => 1
-            ];
+        // Load thông tin sản phẩm đầy đủ
+        $prod_res = $conn->query("SELECT id, name, price, discount_price, cover_image FROM products WHERE id = $product_id");
+        if ($prod_res && $prod_row = $prod_res->fetch_assoc()) {
+            $final_price = ($prod_row['discount_price'] != NULL) ? $prod_row['discount_price'] : $prod_row['price'];
+            
+            if (!isset($_SESSION['cart'])) {
+                $_SESSION['cart'] = [];
+            }
+            if (isset($_SESSION['cart'][$product_id])) {
+                $_SESSION['cart'][$product_id]['quantity'] += 1;
+            } else {
+                $_SESSION['cart'][$product_id] = [
+                    'product_id' => $product_id,
+                    'name' => $prod_row['name'],
+                    'price' => $final_price,
+                    'cover_image' => $prod_row['cover_image'],
+                    'quantity' => 1
+                ];
+            }
         }
     }
 }

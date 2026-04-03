@@ -15,7 +15,7 @@ function getRelatedProducts($conn, $current_product_id, $category_id, $price) {
             FROM products 
             WHERE id != $current_product_id 
             ORDER BY similarity_score DESC, id DESC 
-            LIMIT 4";
+            LIMIT 50";
 
     $result = mysqli_query($conn, $sql);
     return mysqli_fetch_all($result, MYSQLI_ASSOC);

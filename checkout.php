@@ -1,7 +1,28 @@
 <?php
 require_once 'db.php';
 
-// --- 1. XỬ LÝ KHI NGƯỜI DÙNG BẤM "XÁC NHẬN ĐẶT HÀNG" ---
+// --- 1. INITIALIZE CART CHO NGƯỜI DÙNG ĐĂNG NHẬP ---
+if (isset($_SESSION['user_id'])) {
+    $uid = (int)$_SESSION['user_id'];
+    if (!isset($_SESSION['cart']) || empty($_SESSION['cart'])) {
+        $_SESSION['cart'] = [];
+        $cart_res = $conn->query("SELECT c.product_id, c.quantity, p.name, p.price, p.discount_price, p.cover_image FROM cart c JOIN products p ON c.product_id = p.id WHERE c.user_id = $uid");
+        if ($cart_res) {
+            while ($row = $cart_res->fetch_assoc()) {
+                $final_price = ($row['discount_price'] != NULL) ? $row['discount_price'] : $row['price'];
+                $_SESSION['cart'][$row['product_id']] = [
+                    'product_id' => $row['product_id'],
+                    'name' => $row['name'],
+                    'price' => $final_price,
+                    'quantity' => $row['quantity'],
+                    'cover_image' => $row['cover_image']
+                ];
+            }
+        }
+    }
+}
+
+// --- 2. XỬ LÝ KHI NGƯỜI DÙNG BẤM "XÁC NHẬN ĐẶT HÀNG" ---
 if (isset($_POST['place_order'])) {
     $full_name = trim($_POST['full_name']);
     $phone_number = trim($_POST['phone_number']);
@@ -23,13 +44,16 @@ if (isset($_POST['place_order'])) {
         if (isset($_SESSION['cart'][$id])) {
             $item = $_SESSION['cart'][$id];
             $quantity = (int)$qty[$id];
+            if ($quantity <= 0) continue;
             $price = $item['price'];
             $total_money += ($price * $quantity);
-            $order_items[$id] = [
-                'price' => $price,
-                'quantity' => $quantity
-            ];
+            $order_items[$id] = ['price' => $price, 'quantity' => $quantity];
         }
+    }
+
+    if (empty($order_items)) {
+        echo "<script>alert('Không có sản phẩm hợp lệ để đặt hàng.'); window.location.href='cart.php';</script>";
+        exit();
     }
 
     // Bắt đầu Transaction (Đảm bảo lưu đủ 3 bảng, lỗi 1 cái là hủy toàn bộ để tránh sai sót data)
@@ -50,14 +74,34 @@ if (isset($_POST['place_order'])) {
         $order_id = $conn->insert_id; // Lấy ID đơn hàng vừa tạo
         $stmt2->close();
 
-        // Bước 3: Lưu Chi Tiết Đơn Hàng & Xóa món đó khỏi Giỏ
+        // Bước 3: Kiểm tra kho và lưu Chi Tiết Đơn Hàng
         $stmt3 = $conn->prepare("INSERT INTO order_details (order_id, product_id, price, quantity) VALUES (?, ?, ?, ?)");
         foreach ($order_items as $p_id => $data) {
+            // Khoá hàng để tránh race condition
+            $stock_res = $conn->query("SELECT stock_quantity FROM products WHERE id = $p_id FOR UPDATE");
+            if (!$stock_res || $stock_res->num_rows == 0) {
+                throw new Exception('Sản phẩm không tồn tại.');
+            }
+            $stock_row = $stock_res->fetch_assoc();
+            $stock_available = (int)$stock_row['stock_quantity'];
+            if ($stock_available < $data['quantity']) {
+                throw new Exception('Sản phẩm có số lượng không đủ: sản phẩm ID ' . $p_id);
+            }
+
+            // Cập nhật giảm kho
+            $new_stock = $stock_available - $data['quantity'];
+            $conn->query("UPDATE products SET stock_quantity = $new_stock WHERE id = $p_id");
+
+            // Lưu chi tiết đơn hàng
             $stmt3->bind_param("iiii", $order_id, $p_id, $data['price'], $data['quantity']);
             $stmt3->execute();
-            
-            // Đặt hàng xong thì phải xóa món đó khỏi Session giỏ hàng
+
+            // Xóa khỏi giỏ session và DB nếu có
             unset($_SESSION['cart'][$p_id]);
+            if (isset($_SESSION['user_id'])) {
+                $uid = (int)$_SESSION['user_id'];
+                $conn->query("DELETE FROM cart WHERE user_id = $uid AND product_id = $p_id");
+            }
         }
         $stmt3->close();
 
@@ -84,7 +128,31 @@ $selected_ids = isset($_POST['selected_items']) ? $_POST['selected_items'] : [];
 $quantities = isset($_POST['qty']) ? $_POST['qty'] : [];
 
 // Nếu không có món nào được chọn mà cố tình vào trang này -> Đuổi về Giỏ hàng
-if (empty($selected_ids) || !isset($_SESSION['cart'])) {
+if (empty($selected_ids)) {
+    header("Location: cart.php");
+    exit();
+}
+
+// Nếu người dùng đã đăng nhập mà chưa có cart session, nạp từ DB
+if (!isset($_SESSION['cart']) && isset($_SESSION['user_id'])) {
+    $_SESSION['cart'] = [];
+    $uid = (int)$_SESSION['user_id'];
+    $cart_res = $conn->query("SELECT c.product_id, c.quantity, p.name, p.price, p.discount_price, p.cover_image FROM cart c JOIN products p ON c.product_id = p.id WHERE c.user_id = $uid");
+    if ($cart_res) {
+        while ($row = $cart_res->fetch_assoc()) {
+            $final_price = ($row['discount_price'] != NULL) ? $row['discount_price'] : $row['price'];
+            $_SESSION['cart'][$row['product_id']] = [
+                'product_id' => $row['product_id'],
+                'name' => $row['name'],
+                'price' => $final_price,
+                'quantity' => $row['quantity'],
+                'cover_image' => $row['cover_image']
+            ];
+        }
+    }
+}
+
+if (!isset($_SESSION['cart']) || empty($_SESSION['cart'])) {
     header("Location: cart.php");
     exit();
 }
@@ -96,9 +164,24 @@ $total_price = 0;
 foreach ($selected_ids as $id) {
     if (isset($_SESSION['cart'][$id])) {
         $item = $_SESSION['cart'][$id];
+        
+        // Nếu thiếu thông tin sản phẩm, load từ DB
+        if (!isset($item['price']) || !isset($item['name']) || !isset($item['cover_image'])) {
+            $prod_res = $conn->query("SELECT id, name, price, discount_price, cover_image FROM products WHERE id = " . (int)$id);
+            if ($prod_res && $prod_row = $prod_res->fetch_assoc()) {
+                $item['name'] = $prod_row['name'];
+                $item['price'] = ($prod_row['discount_price'] != NULL) ? $prod_row['discount_price'] : $prod_row['price'];
+                $item['cover_image'] = $prod_row['cover_image'];
+            }
+        }
+        
         $item['quantity'] = (int)$quantities[$id];
         $checkout_items[$id] = $item;
-        $total_price += ($item['price'] * $item['quantity']);
+        
+        // Tính tổng an toàn
+        if (isset($item['price'])) {
+            $total_price += ($item['price'] * $item['quantity']);
+        }
     }
 }
 ?>
@@ -179,16 +262,16 @@ foreach ($selected_ids as $id) {
 
                                 <div class="d-flex align-items-center mb-3">
                                     <div class="position-relative me-3">
-                                        <img src="<?= $item['image'] ?>" alt="Img" style="width: 65px; height: 65px; object-fit: cover; border-radius: 8px;" class="border">
+                                        <img src="<?= $item['cover_image'] ?>" alt="Img" style="width: 65px; height: 65px; object-fit: cover; border-radius: 8px;" class="border">
                                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary border border-white">
                                             <?= $item['quantity'] ?>
                                         </span>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <h6 class="mb-1 text-truncate" style="max-width: 200px;" title="<?= htmlspecialchars($item['name']) ?>">
-                                            <?= htmlspecialchars($item['name']) ?>
+                                        <h6 class="mb-1 text-truncate" style="max-width: 200px;" title="<?= htmlspecialchars($item['name'] ?? 'N/A') ?>">
+                                            <?= htmlspecialchars($item['name'] ?? 'Sản phẩm') ?>
                                         </h6>
-                                        <span class="text-danger fw-bold"><?= number_format($item['price'] * $item['quantity']) ?>đ</span>
+                                        <span class="text-danger fw-bold"><?= number_format(($item['price'] ?? 0) * $item['quantity']) ?>đ</span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>

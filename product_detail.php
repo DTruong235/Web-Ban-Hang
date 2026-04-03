@@ -24,6 +24,9 @@ $current_id = $product['id'];
 $cat_id = $product['category_id'];
 $current_price = $product['price'];
 
+// Lấy sản phẩm tương tự
+$related_products = getRelatedProducts($conn, $current_id, $cat_id, $current_price);
+
 ?>
 
 <!DOCTYPE html>
@@ -69,10 +72,10 @@ $current_price = $product['price'];
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Về chúng tôi</a>
+                            <a class="nav-link" href="about.php">Về chúng tôi</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Liện hệ</a>
+                            <a class="nav-link" href="contact.php">Liên hệ</a>
                         </li>
                     </ul>
                     <!-- Đăng nhập | Đăng ký -->
@@ -220,26 +223,135 @@ $current_price = $product['price'];
                 
             </div>
         </div>
-        <div class="product-items mt-5">
-            <?php
 
-                $related_products = getRelatedProducts($conn, $current_id, $cat_id, $current_price);
+        <?php
+        // Xử lý đánh giá sản phẩm
+        if (isset($_POST['submit_review']) && isset($_SESSION['user_id'])) {
+            $rating = (int)$_POST['rating'];
+            $comment = trim($_POST['comment']);
+            if ($rating >= 1 && $rating <= 5) {
+                $uid = (int)$_SESSION['user_id'];
+                $stmt = $conn->prepare("INSERT INTO reviews (product_id, user_id, rating, comment, status) VALUES (?, ?, ?, ?, 0)");
+                $stmt->bind_param('iiis', $current_id, $uid, $rating, $comment);
+                $stmt->execute();
+                $stmt->close();
+                $review_success = 'Cảm ơn bạn đã đánh giá! Đánh giá đang chờ duyệt.';
+            } else {
+                $review_error = 'Vui lòng chọn số sao hợp lệ (1-5).';
+            }
+        }
 
-                echo "<h3>Sản phẩm bạn có thể thích</h3>";
-                echo "<div class='related-products-container'>";
-                foreach ($related_products as $item) {
-                    echo "<div class='product-item'>";
-                    echo "<img src='" . $item['cover_image'] 
-                                    . "' alt='" 
-                                    . htmlspecialchars($item['name']) 
-                                    . "' class='related-product-img'>";
-                    echo "<h4>" . $item['name'] . "</h4>";
-                    echo "<p>" . number_format($item['price']) . " VNĐ</p>";
-                    echo "<a href='product-detail.php?id=" . $item['id'] . "'>Xem chi tiết</a>";
-                    echo "</div>";
-                }
-                echo "</div>";
-            ?>
+        // Lấy đánh giá đã duyệt
+        $reviews = [];
+        $rev_res = $conn->query("SELECT r.*, u.fullname FROM reviews r LEFT JOIN users u ON r.user_id = u.id WHERE r.product_id = $current_id AND r.status = 1 ORDER BY r.created_at DESC");
+        if ($rev_res && $rev_res->num_rows > 0) {
+            while ($r = $rev_res->fetch_assoc()) {
+                $reviews[] = $r;
+            }
+        }
+        ?>
+
+        <div class="mt-4">
+            <h4 class="fw-bold">Đánh giá khách hàng</h4>
+            <?php if (isset($review_success)): ?><div class="alert alert-success"><?= $review_success ?></div><?php endif; ?>
+            <?php if (isset($review_error)): ?><div class="alert alert-danger"><?= $review_error ?></div><?php endif; ?>
+
+            <?php if (isset($_SESSION['user_id'])): ?>
+            <form method="POST" class="mb-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Chấm sao</label>
+                        <select name="rating" class="form-select" required>
+                            <option value="">Chọn sao</option>
+                            <option value="5">★★★★★</option>
+                            <option value="4">★★★★</option>
+                            <option value="3">★★★</option>
+                            <option value="2">★★</option>
+                            <option value="1">★</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Bình luận (tuỳ chọn)</label>
+                        <textarea name="comment" class="form-control" rows="2" placeholder="Chia sẻ cảm nhận của bạn..."></textarea>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" name="submit_review" class="btn btn-success">Gửi đánh giá</button>
+                    </div>
+                </div>
+            </form>
+            <?php else: ?>
+            <div class="alert alert-info">Vui lòng đăng nhập để đánh giá sản phẩm.</div>
+            <?php endif; ?>
+
+            <?php if (count($reviews) > 0): ?>
+                <?php foreach ($reviews as $review): ?>
+                    <div class="border rounded p-3 mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong><?= htmlspecialchars($review['fullname'] ?: 'Khách') ?></strong>
+                            <small class="text-muted"><?= date('d/m/Y H:i', strtotime($review['created_at'])) ?></small>
+                        </div>
+                        <div class="mb-2" style="color:#ffb400;"><?= str_repeat('★', $review['rating']) . str_repeat('☆', 5-$review['rating']) ?></div>
+                        <p class="mb-0 text-muted"><?= nl2br(htmlspecialchars($review['comment'])) ?: '<em>Không có bình luận</em>' ?></p>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p class="text-muted">Chưa có đánh giá nào được duyệt.</p>
+            <?php endif; ?>
+        </div>
+
+        <?php if (!empty($related_products) && count($related_products) > 0): ?>
+            <div class="mt-5">
+                <h3>Sản phẩm bạn có thể thích</h3>
+                <?php
+                    $showedCount = 10;
+                    $loadMoreStep = 10;
+                ?>
+                <div id="related-container" class="related-carousel pt-2 pb-2" style="display:flex; gap: 12px; overflow-x: auto; overflow-y: hidden; padding-bottom: 8px;">
+                    <?php foreach ($related_products as $index => $item): ?>
+                        <div class="related-item card shadow-sm border-0" style="flex: 0 0 240px;" data-related-item>
+                            <a href="product_detail.php?id=<?= $item['id'] ?>" class="text-decoration-none text-dark">
+                                <div style="height: 170px; overflow: hidden;">
+                                    <img src="<?= $item['cover_image'] ?>" alt="<?= htmlspecialchars($item['name']) ?>" style="width: 100%; height: 100%; object-fit: contain; background-color: #fff;" />
+                                </div>
+                                <div class="card-body p-2">
+                                    <h6 class="card-title fs-6 mb-1" style="min-height: 40px;"><?= htmlspecialchars($item['name']) ?></h6>
+                                    <p class="text-danger fw-bold mb-2" style="font-size: 0.95rem;"><?= number_format($item['price']) ?> đ</p>
+                                </div>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <style>
+                .related-carousel::-webkit-scrollbar { height: 8px; }
+                .related-carousel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 4px; }
+                .related-carousel::-webkit-scrollbar-track { background: rgba(255,255,255,0.7); }
+            </style>
+        <?php endif; ?>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const loadMoreBtn = document.getElementById('btn-load-more');
+                if (!loadMoreBtn) return;
+
+                loadMoreBtn.addEventListener('click', function() {
+                    const hiddenItems = document.querySelectorAll('[data-related-item][style*="display: none"]');
+                    const showNext = 10; // hiển thị thêm 10
+                    let shown = 0;
+
+                    hiddenItems.forEach(function(item) {
+                        if (shown < showNext) {
+                            item.style.display = 'block';
+                            shown++;
+                        }
+                    });
+
+                    if (document.querySelectorAll('[data-related-item][style*="display: none"]').length === 0) {
+                        loadMoreBtn.style.display = 'none';
+                    }
+                });
+            });
+        </script>
         </div>
     </section>
     

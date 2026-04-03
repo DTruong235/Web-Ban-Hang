@@ -243,6 +243,33 @@ body {
 .related-product-img {
     width: 100%;
     height: 200px; /* Hoặc chiều cao bạn muốn */
-    object-fit: contain; /* Giữ nguyên tỉ lệ ảnh để không bị cắt mất chữ trên thùng nước ngọt */
+    object-fit: contain; 
     background: #f9f9f9;
 }
+
+.display-4.fw-bold {
+    color: var(--tempi-green); /* Dùng màu xanh chủ đạo */
+    position: relative;
+    padding-bottom: 15px;
+    letter-spacing: -1px; /* Tạo cảm giác hiện đại, gọn gàng */
+}
+
+.display-4.fw-bold::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 4px;
+    background-color: var(--tempi-yellow); /* Điểm xuyết màu vàng thương hiệu */
+    border-radius: 2px;
+}
+.lead {
+    color: #555; /* Màu xám đậm cho dễ đọc trên nền sáng */
+    font-weight: 400;
+    margin-top: 20px;
+    font-style: italic; /* Tạo nét mềm mại cho slogan */
+    border-left: 3px solid var(--tempi-yellow); /* Thêm vạch đứng màu vàng bên trái */
+    padding-left: 15px;
+}
+
